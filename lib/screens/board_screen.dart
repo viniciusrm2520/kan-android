@@ -272,6 +272,21 @@ class _BoardScreenState extends State<BoardScreen> {
                 child: LinearProgressIndicator(minHeight: 2))
             : null,
         actions: [
+          if (board != null)
+            MediaQuery.sizeOf(context).width >= 700
+                ? Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilledButton.tonalIcon(
+                      onPressed: _addList,
+                      icon: const Icon(Icons.playlist_add),
+                      label: const Text('Nova lista'),
+                    ),
+                  )
+                : IconButton(
+                    tooltip: 'Nova lista',
+                    icon: const Icon(Icons.playlist_add),
+                    onPressed: _addList,
+                  ),
           IconButton(
             tooltip: 'Filtros',
             icon: Badge(
@@ -317,39 +332,57 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   Widget _buildBoard(Board board) {
-    final width = MediaQuery.of(context).size.width;
-    final colWidth = (width * 0.85).clamp(240.0, 320.0);
-    return Container(
-      color: Theme.of(context).colorScheme.surfaceContainerLowest,
-      child: Scrollbar(
-        controller: _hScroll,
-        thumbVisibility: !_isMobile,
-        child: ListView(
-        controller: _hScroll,
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.fromLTRB(8, 8, 8, _isMobile ? 8 : 20),
-        children: [
-          for (final list in board.lists) _buildColumn(board, list, colWidth),
-          SizedBox(
-            width: colWidth,
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48)),
-                  onPressed: _addList,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Adicionar lista'),
-                ),
-              ),
+    final bg = Theme.of(context).colorScheme.surfaceContainerLowest;
+    if (board.lists.isEmpty) {
+      return Container(
+        color: bg,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.view_column_outlined,
+                size: 56, color: Theme.of(context).colorScheme.outline),
+            const SizedBox(height: 12),
+            const Text('Este quadro ainda não tem listas.'),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _addList,
+              icon: const Icon(Icons.playlist_add),
+              label: const Text('Nova lista'),
             ),
-          ),
-        ],
+          ],
         ),
-      ),
-    );
+      );
+    }
+    return LayoutBuilder(builder: (context, constraints) {
+      final width = constraints.maxWidth;
+      // Celular: coluna quase da largura da tela. Desktop: colunas fixas.
+      final colWidth = (width * 0.85).clamp(240.0, 320.0);
+      const sidePad = 8.0;
+      const colSpace = 8.0; // margem horizontal de cada coluna (4 + 4)
+      final content =
+          board.lists.length * (colWidth + colSpace) + sidePad * 2;
+      // Se todas as listas cabem na tela, centraliza o quadro.
+      final extra = content < width ? (width - content) / 2 : 0.0;
+      return Container(
+        color: bg,
+        child: Scrollbar(
+          controller: _hScroll,
+          thumbVisibility: !_isMobile,
+          child: ListView(
+            controller: _hScroll,
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.fromLTRB(
+                sidePad + extra, 8, sidePad + extra, _isMobile ? 8 : 20),
+            children: [
+              for (final list in board.lists)
+                _buildColumn(board, list, colWidth),
+            ],
+          ),
+        ),
+      );
+    });
   }
 
   Widget _buildColumn(Board board, BoardList list, double width) {
