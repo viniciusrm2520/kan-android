@@ -36,3 +36,9 @@ Thumbs.db
 
 # Exportações do FlutLab
 *.zip
+
+# Desktop (gerados pelo Flutter a cada build)
+windows/flutter/ephemeral/
+linux/flutter/ephemeral/
+macos/Flutter/ephemeral/
+macos/Pods/

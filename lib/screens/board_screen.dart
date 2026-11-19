@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models.dart';
@@ -19,6 +20,11 @@ class _DragCard {
   final String fromListId;
   _DragCard(this.card, this.fromListId);
 }
+
+/// Celular: arrasta com toque longo. Desktop (mouse): arrasta direto.
+bool get _isMobile =>
+    defaultTargetPlatform == TargetPlatform.android ||
+    defaultTargetPlatform == TargetPlatform.iOS;
 
 const _dueFilters = <String, String>{
   'overdue': 'Atrasados',
@@ -312,10 +318,13 @@ class _BoardScreenState extends State<BoardScreen> {
     final colWidth = (width * 0.85).clamp(240.0, 320.0);
     return Container(
       color: Theme.of(context).colorScheme.surfaceContainerLowest,
-      child: ListView(
+      child: Scrollbar(
+        controller: _hScroll,
+        thumbVisibility: !_isMobile,
+        child: ListView(
         controller: _hScroll,
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.all(8),
+        padding: EdgeInsets.fromLTRB(8, 8, 8, _isMobile ? 8 : 20),
         children: [
           for (final list in board.lists) _buildColumn(board, list, colWidth),
           SizedBox(
@@ -335,6 +344,7 @@ class _BoardScreenState extends State<BoardScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -418,21 +428,32 @@ class _BoardScreenState extends State<BoardScreen> {
           prefix: board.cardPrefix,
           onTap: () => _openCard(card),
         );
+        final data = _DragCard(card, list.publicId);
+        final feedback = Material(
+          elevation: 8,
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(width: 260, child: tile),
+        );
+        final ghost = Opacity(opacity: 0.3, child: tile);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (candidates.isNotEmpty) const _DropIndicator(),
-            LongPressDraggable<_DragCard>(
-              data: _DragCard(card, list.publicId),
-              onDragUpdate: _autoScroll,
-              feedback: Material(
-                elevation: 8,
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(width: 260, child: tile),
-              ),
-              childWhenDragging: Opacity(opacity: 0.3, child: tile),
-              child: tile,
-            ),
+            _isMobile
+                ? LongPressDraggable<_DragCard>(
+                    data: data,
+                    onDragUpdate: _autoScroll,
+                    feedback: feedback,
+                    childWhenDragging: ghost,
+                    child: tile,
+                  )
+                : Draggable<_DragCard>(
+                    data: data,
+                    onDragUpdate: _autoScroll,
+                    feedback: feedback,
+                    childWhenDragging: ghost,
+                    child: tile,
+                  ),
           ],
         );
       },

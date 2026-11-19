@@ -1,0 +1,149 @@
+name: Build
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ['v*']
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: write # necessário para publicar a Release nas tags v*
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: 3.41.x # mesma versão do FlutLab
+
+jobs:
+  android:
+    name: Android (APK)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - name: Análise estática
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Build
+        run: flutter build apk --release --build-number=${{ github.run_number }}
+      - name: Empacotar
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             "dist/kan-${GITHUB_REF_NAME//\//-}-${{ github.run_number }}-android.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kan-android-${{ github.run_number }}
+          path: dist/*
+          retention-days: 30
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - name: Build
+        run: flutter build windows --release --build-number=${{ github.run_number }}
+      - name: Empacotar
+        shell: pwsh
+        run: |
+          $ref = $env:GITHUB_REF_NAME -replace '/', '-'
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path build/windows/x64/runner/Release/* `
+            -DestinationPath "dist/kan-$ref-${{ github.run_number }}-windows-x64.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kan-windows-${{ github.run_number }}
+          path: dist/*
+          retention-days: 30
+
+  linux:
+    name: Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Dependências do sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - name: Build
+        run: flutter build linux --release --build-number=${{ github.run_number }}
+      - name: Empacotar
+        run: |
+          mkdir -p dist
+          tar -czf "dist/kan-${GITHUB_REF_NAME//\//-}-${{ github.run_number }}-linux-x64.tar.gz" \
+              -C build/linux/x64/release/bundle .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kan-linux-${{ github.run_number }}
+          path: dist/*
+          retention-days: 30
+
+  macos:
+    name: macOS
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - name: Build
+        run: flutter build macos --release --build-number=${{ github.run_number }}
+      - name: Empacotar
+        run: |
+          mkdir -p dist
+          ditto -c -k --keepParent build/macos/Build/Products/Release/Kan.app \
+              "dist/kan-${GITHUB_REF_NAME//\//-}-${{ github.run_number }}-macos.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kan-macos-${{ github.run_number }}
+          path: dist/*
+          retention-days: 30
+
+  release:
+    name: Publicar Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [android, windows, linux, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: ls -lh dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
