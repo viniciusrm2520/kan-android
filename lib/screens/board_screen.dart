@@ -385,15 +385,34 @@ class _BoardScreenState extends State<BoardScreen> {
     });
   }
 
+  /// A coluna inteira (título, espaço vazio, rodapé) aceita o cartão e o
+  /// coloca no fim da lista. Em cima de um cartão, o alvo do próprio cartão
+  /// tem prioridade e insere antes dele.
   Widget _buildColumn(Board board, BoardList list, double width) {
+    return DragTarget<_DragCard>(
+      onAcceptWithDetails: (d) =>
+          _moveCard(d.data, list.publicId, list.cards.length),
+      builder: (context, candidates, _) =>
+          _buildColumnBody(board, list, width, hovering: candidates.isNotEmpty),
+    );
+  }
+
+  Widget _buildColumnBody(Board board, BoardList list, double width,
+      {required bool hovering}) {
     final cs = Theme.of(context).colorScheme;
     final pos = board.lists.indexOf(list);
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
       width: width,
       margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHigh,
+        color: hovering
+            ? Color.alphaBlend(
+                cs.primary.withValues(alpha: 0.08), cs.surfaceContainerHigh)
+            : cs.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+            color: hovering ? cs.primary : Colors.transparent, width: 2),
       ),
       child: Column(
         children: [
@@ -433,7 +452,8 @@ class _BoardScreenState extends State<BoardScreen> {
               children: [
                 for (var i = 0; i < list.cards.length; i++)
                   _buildCardSlot(board, list, i),
-                _buildEndTarget(list),
+                if (hovering) const _DropIndicator(),
+                SizedBox(height: list.cards.isEmpty ? 80 : 40),
               ],
             ),
           ),
@@ -456,9 +476,11 @@ class _BoardScreenState extends State<BoardScreen> {
   Widget _buildCardSlot(Board board, BoardList list, int index) {
     final card = list.cards[index];
     return DragTarget<_DragCard>(
-      onWillAcceptWithDetails: (d) => d.data.card.publicId != card.publicId,
+      // Aceita também o próprio cartão (soltar nele mesmo não faz nada), para
+      // que a coluna não o capture e o mande para o fim da lista.
       onAcceptWithDetails: (d) => _moveCard(d.data, list.publicId, index),
       builder: (context, candidates, _) {
+        final isSelf = candidates.any((c) => c?.card.publicId == card.publicId);
         final tile = _CardTile(
           card: card,
           prefix: board.cardPrefix,
@@ -474,7 +496,7 @@ class _BoardScreenState extends State<BoardScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (candidates.isNotEmpty) const _DropIndicator(),
+            if (candidates.isNotEmpty && !isSelf) const _DropIndicator(),
             _isMobile
                 ? LongPressDraggable<_DragCard>(
                     data: data,
@@ -496,18 +518,6 @@ class _BoardScreenState extends State<BoardScreen> {
     );
   }
 
-  Widget _buildEndTarget(BoardList list) {
-    return DragTarget<_DragCard>(
-      onAcceptWithDetails: (d) =>
-          _moveCard(d.data, list.publicId, list.cards.length),
-      builder: (context, candidates, _) => Column(
-        children: [
-          if (candidates.isNotEmpty) const _DropIndicator(),
-          SizedBox(height: list.cards.isEmpty ? 80 : 40),
-        ],
-      ),
-    );
-  }
 }
 
 class _DropIndicator extends StatelessWidget {
