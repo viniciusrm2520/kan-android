@@ -42,3 +42,6 @@ windows/flutter/ephemeral/
 linux/flutter/ephemeral/
 macos/Flutter/ephemeral/
 macos/Pods/
+
+# Pasta local (não versionar)
+/Nova pasta/
