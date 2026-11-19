@@ -290,12 +290,17 @@ class KanApi {
     List<String> members = const [],
     List<String> labels = const [],
     List<String> dueDateFilters = const [],
-  }) async =>
-      Board.fromJson(_map(await _get('/boards/$boardId', {
-        'members': members,
-        'labels': labels,
-        'dueDateFilters': dueDateFilters,
-      })));
+  }) async {
+    // A API antiga (trpc-to-openapi) transforma `?x=a` em "a" (texto) e só
+    // vira lista com o parâmetro repetido; como o filtro espera lista, um
+    // único valor dava erro 400. Repetir o valor não altera o resultado.
+    List<String> asArray(List<String> v) => v.length == 1 ? [v[0], v[0]] : v;
+    return Board.fromJson(_map(await _get('/boards/$boardId', {
+      'members': asArray(members),
+      'labels': asArray(labels),
+      'dueDateFilters': asArray(dueDateFilters),
+    })));
+  }
 
   Future<String> createBoard(
     String workspaceId, {

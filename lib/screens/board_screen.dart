@@ -73,7 +73,10 @@ class _BoardScreenState extends State<BoardScreen> {
         _error = null;
       });
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      if (!mounted) return;
+      setState(() => _error = '$e');
+      // Com o quadro já na tela, o erro não aparecia: avisa por snackbar.
+      if (_board != null) showError(context, e);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
