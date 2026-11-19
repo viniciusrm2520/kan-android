@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../api/kan_api.dart';
 import '../models.dart';
 import '../session.dart';
 import '../utils.dart';
@@ -17,6 +19,9 @@ class _BoardSettingsScreenState extends State<BoardSettingsScreen> {
   late Board _board = widget.board;
   List<Member>? _boardMembers;
   String? _membersError;
+
+  /// O kan.bn em produção ainda não publica /boards/{id}/members na API REST.
+  bool _membersUnsupported = false;
 
   String get _id => _board.publicId;
 
@@ -44,9 +49,24 @@ class _BoardSettingsScreenState extends State<BoardSettingsScreen> {
           _membersError = null;
         });
       }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        if (e.statusCode == 404 || e.statusCode == 405) {
+          _membersUnsupported = true;
+        } else {
+          _membersError = '$e';
+        }
+      });
     } catch (e) {
       if (mounted) setState(() => _membersError = '$e');
     }
+  }
+
+  Future<void> _openInBrowser() async {
+    final ok = await launchUrl(Uri.parse('${Session.siteUrl}/boards/$_id'),
+        mode: LaunchMode.externalApplication);
+    if (!ok && mounted) showMsg(context, 'Não foi possível abrir o navegador');
   }
 
   Future<void> _run(Future<void> Function() action,
@@ -252,11 +272,31 @@ class _BoardSettingsScreenState extends State<BoardSettingsScreen> {
             onTap: _addLabel,
           ),
           const _Section('Membros do quadro'),
-          if (_membersError != null)
+          if (_membersUnsupported) ...[
+            const ListTile(
+              leading: Icon(Icons.info_outline),
+              title: Text('Ainda não disponível pelo app'),
+              subtitle: Text(
+                  'O servidor do Kan ainda não libera os membros do quadro '
+                  'pela API. Por enquanto, gerencie pelo site.'),
+            ),
             ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: const Text('Gerenciar membros do quadro indisponível'),
+              leading: const Icon(Icons.open_in_new),
+              title: const Text('Abrir quadro no navegador'),
+              onTap: _openInBrowser,
+            ),
+          ] else if (_membersError != null)
+            ListTile(
+              leading: const Icon(Icons.error_outline),
+              title: const Text('Não foi possível carregar os membros'),
               subtitle: Text(_membersError!),
+              trailing: IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () {
+                  setState(() => _membersError = null);
+                  _loadMembers();
+                },
+              ),
             )
           else if (members == null)
             const Padding(
