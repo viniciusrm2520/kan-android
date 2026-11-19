@@ -279,7 +279,10 @@ class KanApi {
           {bool templates = false, bool archived = false}) async =>
       _list(await _get('/workspaces/$workspaceId/boards', {
         'type': templates ? 'template' : 'regular',
-        'archived': archived ? 'true' : 'false',
+        // Só envia quando true: a API antiga do kan.bn converte a string
+        // "false" com Boolean("false") === true e devolveria só arquivados.
+        // Sem o parâmetro, as duas versões listam apenas os não arquivados.
+        'archived': archived ? 'true' : null,
       })).map(BoardSummary.fromJson).toList();
 
   Future<Board> getBoard(
