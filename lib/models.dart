@@ -58,9 +58,22 @@ class Workspace {
 
   bool get isAdmin => role == 'admin';
 
-  /// Item de GET /workspaces ({role, workspace: {...}}).
+  Workspace copyWith({String? role}) => Workspace(
+        publicId: publicId,
+        name: name,
+        slug: slug,
+        description: description,
+        plan: plan,
+        cardPrefix: cardPrefix,
+        role: role ?? this.role,
+      );
+
+  /// Item de GET /workspaces. Aceita os dois formatos que o Kan devolve:
+  /// `{role, workspace: {...}}` (documentação) ou `{publicId, name, ...}`
+  /// (achatado, usado pelo kan.bn em produção).
   factory Workspace.fromListItem(Map<String, dynamic> j) {
-    final w = _m(j['workspace']);
+    final nested = j['workspace'];
+    final w = nested is Map ? _m(nested) : j;
     return Workspace(
       publicId: _s(w['publicId']),
       name: _s(w['name']),
@@ -68,7 +81,7 @@ class Workspace {
       description: _ns(w['description']),
       plan: _s(w['plan']),
       cardPrefix: _s(w['cardPrefix']),
-      role: _s(j['role']),
+      role: _s(j['role'] ?? w['role']),
     );
   }
 }

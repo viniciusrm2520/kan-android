@@ -141,10 +141,22 @@ class KanApi {
 
   // ------------------------------------------------------------- Workspaces
 
-  Future<List<Workspace>> getWorkspaces() async => _list(await _get('/workspaces'))
-      .map(Workspace.fromListItem)
-      .where((w) => w.publicId.isNotEmpty)
-      .toList();
+  Future<List<Workspace>> getWorkspaces() async {
+    final ws = _list(await _get('/workspaces'))
+        .where((j) => j['deletedAt'] == null)
+        .map(Workspace.fromListItem)
+        .where((w) => w.publicId.isNotEmpty)
+        .toList();
+    // O formato achatado não traz o papel do usuário: busca em paralelo.
+    return Future.wait(ws.map((w) async {
+      if (w.role.isNotEmpty) return w;
+      try {
+        return w.copyWith(role: await myRole(w.publicId));
+      } catch (_) {
+        return w;
+      }
+    }));
+  }
 
   Future<WorkspaceDetail> getWorkspace(String id) async =>
       WorkspaceDetail.fromJson(_map(await _get('/workspaces/$id')));
